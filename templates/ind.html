@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Health Monitoring Dashboard</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 800px; margin: auto; text-align: center; }
+        .alert-box { background: red; color: white; padding: 10px; margin: 10px; border-radius: 5px; }
+        .patient-card { border: 1px solid #ddd; padding: 10px; margin: 10px; border-radius: 5px; }
+        .healthy { background: lightgreen; }
+        .critical { background: lightcoral; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏥 Health Monitoring Dashboard</h1>
+        <div id="alerts"></div>
+        <h2>Patient Overview</h2>
+        <div id="patients"></div>
+    </div>
+
+    <script>
+        function fetchAlerts() {
+            $.getJSON("/get_alerts", function(data) {
+                $("#alerts").empty();
+                $("#patients").empty();
+                
+                if (data.alerts.length === 0) {
+                    $("#alerts").append('<p>No critical alerts</p>');
+                } else {
+                    data.alerts.forEach(alert => {
+                        $("#alerts").append('<div class="alert-box">' + alert.message + ' (' + alert.time + ')</div>');
+                    });
+                }
+
+                data.patients.forEach(patient => {
+                    let classType = (patient.glucose_level < 70 || patient.glucose_level > 180 || patient.bp[0] > 140 || patient.bp[1] > 90) ? 'critical' : 'healthy';
+                    $("#patients").append('<div class="patient-card ' + classType + '"><b>' + patient.name + '</b><br>Condition: ' + patient.condition + '<br>Glucose: ' + patient.glucose_level + ' mg/dL<br>BP: ' + patient.bp[0] + '/' + patient.bp[1] + ' mmHg</div>');
+                });
+            });
+        }
+
+        setInterval(fetchAlerts, 5000);
+        fetchAlerts();
+    </script>
+</body>
+</html>

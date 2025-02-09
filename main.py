@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 current_date = datetime.now(timezone.utc)
 
 # Calculate the date range for the last week
-start_date = current_date - timedelta(days=1)
+start_date = current_date - timedelta(days=30)
 end_date = current_date
 
 # Format the datetime objects without timezone information
@@ -37,27 +37,7 @@ def index():
     )
     return redirect(authorization_url)
 
-@app.route('/callback')
-def callback():
-    auth_code = request.args.get('code')
-    if not auth_code:
-        return "Error: Authorization code missing."
 
-    access_token = get_access_token(auth_code)
-    if access_token:
-        glucose_data = fetch_glucose_data(access_token, start_date_str, end_date_str)
-        if glucose_data:
-            
-            if "egvs" in glucose_data and glucose_data["egvs"]:
-                glucose_df = convert_to_dataframe(glucose_data["egvs"])
-                alerts = glucose_alert(glucose_df)
-                return render_template("table.html", glucose_data=glucose_df.to_html(classes='data', header=True),alerts=alerts)
-            else:
-                return "No glucose data available for the specified date range."
-        else:
-            return "Error: Failed to fetch glucose data."
-    else:
-        return "Error: Failed to fetch access token."
 
 # Step 3: Exchange authorization code for access token
 def get_access_token(auth_code):
@@ -92,51 +72,37 @@ def fetch_glucose_data(access_token, start_date_str, end_date_str):
         print(f"Response content: {response.text}")
 
         return None
+@app.route('/callback')
+def callback():
+    auth_code = request.args.get('code')
+    if not auth_code:
+        return "Error: Authorization code missing."
 
+    access_token = get_access_token(auth_code)
+    if access_token:
+        glucose_data = fetch_glucose_data(access_token, start_date_str, end_date_str)
+        if glucose_data:
+            
+            if "egvs" in glucose_data and glucose_data["egvs"]:
+                glucose_df = convert_to_dataframe(glucose_data["egvs"])
+            
+                return render_template("table.html", glucose_data=glucose_df.to_html(classes='data', header=True))
+            else:
+                return "No glucose data available for the specified date range."
+        else:
+            return "Error: Failed to fetch glucose data."
+    else:
+        return "Error: Failed to fetch access token."
 def convert_to_dataframe(data):
     import pandas as pd
     df = pd.DataFrame(data)
-    df.insert(0, 'id', range(1001, 1001 + len(df)))
-    print(df.head())
     df.ffill(inplace=True)
-    df['systemTime'] = pd.to_datetime(df['systemTime'])
-    df['displayTime'] = pd.to_datetime(df['displayTime'])
-    df['year'] = df['systemTime'].dt.year
-    df['day'] = df['systemTime'].dt.day
-    df['hour'] = df['systemTime'].dt.hour
-    df['minute'] = df['systemTime'].dt.minute
-    df['second'] = df['systemTime'].dt.second
+    
 
     
     df.to_csv('glucose_data.csv', index=False)
 
     return df
-
-
-def glucose_alert(df):
-    
-    low_threshold = 70
-    high_threshold = 180
-    rapid_change_threshold = 1
-
-    
-    alerts = []
-
-    
-    for index, row in df.iterrows():
-        if row['value'] < low_threshold:
-            alerts.append(f"Low Glucose Alert at {row['systemTime']}: Glucose value is {row['value']}.")
-        elif row['value'] > high_threshold:
-            alerts.append(f"High Glucose Alert at {row['systemTime']}: Glucose value is {row['value']}.")
-        
-        if row['trendRate'] > rapid_change_threshold:
-            alerts.append(f"Rapid Glucose Increase Alert at {row['systemTime']}: Trend rate is {row['trendRate']}.")
-        elif row['trendRate'] < -rapid_change_threshold:
-            alerts.append(f"Rapid Glucose Drop Alert at {row['systemTime']}: Trend rate is {row['trendRate']}.")
-
-    return alerts
-
-
 
 
 if __name__ == '__main__':
